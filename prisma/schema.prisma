@@ -1,0 +1,47 @@
+
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum CardType {
+  DEBIT_CARD
+  CREDIT_CARD
+}
+
+model Customer {
+  id       Int     @id @default(autoincrement())
+  name     String  @db.VarChar(150)
+  email    String  @unique @db.VarChar(150)
+  cpf      String  @unique @db.VarChar(11)
+  password String  @db.VarChar(250)
+  phone    String  @db.VarChar(11)
+  account  Account?
+}
+
+model Account {
+  id            Int      @id @default(autoincrement())
+  customerId    Int      @unique
+  customer      Customer @relation(fields: [customerId], references: [id])
+  accountNumber String   @unique @db.VarChar(16)
+  balance       Decimal  @default(0.00) @db.Decimal(10, 2)
+  creditLimit   Decimal? @default(0.00) @db.Decimal(10, 2)
+  pixKey        String?
+  cards         Card[]   
+}
+
+model Card {
+  id             Int       @id @default(autoincrement())
+  account        Account   @relation(fields: [accountId], references: [id])
+  accountId      Int
+  cardNumber     String    @db.VarChar(16)
+  cvv            String    @db.VarChar(3)
+  expirationDate DateTime
+  cardType       CardType
+}
