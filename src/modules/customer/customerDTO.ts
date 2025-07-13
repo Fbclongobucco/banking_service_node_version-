@@ -6,3 +6,10 @@ export type CustomerDTO = {
     password: string
     phone: string
 }
+
+
+export type CustomerUpdateDTO = {
+    name?: string
+    cpf?: string 
+    phone?: string
+}

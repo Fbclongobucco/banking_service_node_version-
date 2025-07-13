@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from 'src/prisma.service';
-import { CustomerDTO } from './customerDTO';
+import { CustomerDTO, CustomerUpdateDTO } from './customerDTO';
 import * as bcrypt from 'bcrypt';
 
 @Injectable()
@@ -51,8 +51,73 @@ export class CustomerService {
         return customer;
     }
 
-    async findAllCustomers(){
-      return await this.prisma.customer.findMany()
-        
+    async findAllCustomers(size?: string, page?: string) {
+        const defaultSize = 10;
+        const defaultPage = 0;
+
+        const finalSize =  size ? parseInt(size, 10) : defaultSize;
+        const finalPage = page ? parseInt(page, 10) : defaultPage;
+
+        return await this.prisma.customer.findMany({
+            skip: finalPage * finalSize,
+            take: finalSize,
+            select: {
+                id: true,
+                name: true,
+                email: true,
+                cpf: true,
+                phone: true,
+            },
+        });
     }
+
+
+
+
+    async updateCustomer(idCustomer: number, customer: CustomerUpdateDTO) {
+
+        await this.prisma.customer.update({
+            where: {
+                id: idCustomer,
+            },
+            data: {
+                name: customer.name,
+                cpf: customer.cpf,
+                phone: customer.phone
+            }
+
+        }
+        )
+    }
+
+
+    async deleteCustomer(id: number) {
+        await this.prisma.customer.delete({
+            where: {
+                id
+            }
+        })
+    }
+
+    async findCustomer(id: number) {
+
+        
+        return await this.prisma.customer.findUnique({
+            where: {
+                id
+            }, select: {
+                id: true,
+                name: true,
+                email: true,
+                cpf: true,
+                phone: true
+            }
+
+        })
+
+    }
+
+
+
+
 }

@@ -28,7 +28,7 @@ model Customer {
 model Account {
   id            Int      @id @default(autoincrement())
   customerId    Int      @unique
-  customer      Customer @relation(fields: [customerId], references: [id])
+  customer      Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
   accountNumber String   @unique @db.VarChar(16)
   balance       Decimal  @default(0.00) @db.Decimal(10, 2)
   creditLimit   Decimal? @default(0.00) @db.Decimal(10, 2)
@@ -38,7 +38,7 @@ model Account {
 
 model Card {
   id             Int       @id @default(autoincrement())
-  account        Account   @relation(fields: [accountId], references: [id])
+  account        Account   @relation(fields: [accountId], references: [id], onDelete: Cascade)
   accountId      Int
   cardNumber     String    @db.VarChar(16)
   cvv            String    @db.VarChar(3)
