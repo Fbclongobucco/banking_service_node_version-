@@ -10,6 +10,7 @@ export class CustomerService {
     }
 
     async createCustomer(data: CustomerDTO) {
+        
     const hashedPassword = await bcrypt.hash(data.password, 10);
 
     const generateAccountNumber = () =>
