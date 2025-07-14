@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from 'src/prisma.service';
-import { CardType } from './cardDTO';
+
 
 
 @Injectable()
@@ -9,7 +9,7 @@ export class CardService {
     constructor(private readonly prismaService: PrismaService) {
     }
 
-    async createDebitCard(accountId: number, typeCard: CardType) {
+    async createDebitCard(accountId: number) {
         const account = await this.prismaService.account.findUnique({
             where: {
                 id: accountId,
@@ -54,8 +54,8 @@ export class CardService {
         };
     }
 
-    async setCreditCard(cardId: number) {
-        await this.prismaService.card.update({
+    async setCreditCard(cardId: number, valueLimit: number) {
+        const card = await this.prismaService.card.update({
             where: {
                 id: cardId
             },
@@ -64,16 +64,73 @@ export class CardService {
             }
         }
         )
+
+        await this.prismaService.account.update({
+            where: {
+                id: card.accountId
+            }, data: {
+                creditLimit: valueLimit
+            }
+        })
     }
 
-    async getCardById(cardId: number){
+    async getCardById(cardId: number) {
         const card = await this.prismaService.card.findUnique({
             where: {
                 id: cardId
+            }, select: {
+                id: true,
+                cardNumber: true,
+                cardType: true,
+                cvv: true,
+                account: {
+                    select: {
+                        accountNumber: true,
+                        creditLimit: true,
+                        customer: {
+                            select: {
+                                name: true
+                            }
+                        }
+                    }
+                }
             }
         })
         return card
     }
 
+    async getAllCards(size?: string, page?: string) {
+
+        const defaultSize = 10;
+        const defaultPage = 0;
+
+        const finalSize = size ? parseInt(size, 10) : defaultSize;
+        const finalPage = page ? parseInt(page, 10) : defaultPage;
+
+        const cards = await this.prismaService.card.findMany({
+
+            skip: finalPage * finalSize,
+            take: finalSize,
+            select: {
+                id: true,
+                cardNumber: true,
+                cardType: true,
+                cvv: true,
+                account: {
+                    select: {
+                        accountNumber: true,
+                        creditLimit: true,
+                        customer: {
+                            select: {
+                                name: true
+                            }
+                        }
+                    }
+                }
+            }
+
+        })
+        return cards;
+    }
 
 }
