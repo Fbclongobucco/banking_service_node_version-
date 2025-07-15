@@ -7,7 +7,7 @@ export type CardDTO = {
     cardNumber: string
     cvv: string 
     expirationDate: Date
-    cardDype: CardType
+    cardType: CardType
 }
 
 export enum CardType {
