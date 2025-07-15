@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from 'src/prisma.service';
-import { PaymentCardDTO, ReceivePaymentDTO } from './paymentDTO';
+import { PaymentBarCodeDTO, PaymentCardDTO, ReceivePaymentDTO } from './paymentDTO';
 import { Decimal } from '@prisma/client/runtime/library';
 import { CardType } from 'generated/prisma';
 
@@ -154,6 +154,28 @@ export class PaymentService {
         ]);
     }
 
+    async generateBarCode(data: PaymentBarCodeDTO) {
+        const account = await this.prismaService.account.findUnique({
+            where: {
+                id: data.accountId
+            }
+        })
 
+
+        if (!account) {
+            throw new Error('Account not found');
+        }
+
+        const payment = await this.prismaService.payment.create({
+            data: {
+                date: new Date(),
+                accountId: account.id,
+                barcode: data.barCode,
+                description: data.productDescription,
+                payment: 'BANK_SLIP'
+            }
+        })
+        return payment.barcode
+    }
 
 }

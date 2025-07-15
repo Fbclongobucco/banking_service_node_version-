@@ -7,13 +7,18 @@ export type PaymentCardDTO = {
     destinationAccount : string
 }
 
-export class ReceivePaymentDTO {
+export type ReceivePaymentDTO = {
  
   numAccount: string  
-
   destination: string; 
- 
   amount: string;
-
   barcode?: string; 
 }
+
+export type PaymentBarCodeDTO = {
+  accountId: number
+  productDescription: string
+  amount: number
+  barCode: string
+}
+

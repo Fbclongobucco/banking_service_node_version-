@@ -59,6 +59,7 @@ model Payment {
   accountId   Int
   payment     PaymentTypes
   amount      Decimal      @default(0.00) @db.Decimal(10, 2)
-  date        DateTime
+  date        DateTime    
   description String       @db.VarChar(200)
+  barcode     String       @unique @db.VarChar(44)
 }
