@@ -37,7 +37,7 @@ model Account {
   accountNumber String   @unique @db.VarChar(16)
   balance       Decimal  @default(0.00) @db.Decimal(10, 2)
   creditLimit   Decimal? @default(0.00) @db.Decimal(10, 2)
-  pixKey        String?
+  pixKey        String?  @unique @db.VarChar(100)
   cards         Card[]
 
   Payment Payment[]
