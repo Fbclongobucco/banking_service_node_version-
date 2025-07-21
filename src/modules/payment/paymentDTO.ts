@@ -11,14 +11,15 @@ export type ReceivePaymentDTO = {
  
   numAccount: string  
   destination: string; 
-  amount: string;
-  barcode?: string; 
+  amount: number;
+  barcode?: string;
+  description: string; 
 }
 
 export type PaymentBarCodeDTO = {
   accountId: number
   productDescription: string
   amount: number
-  barCode: string
+  barcode: string
 }
 

@@ -6,10 +6,7 @@ import { CardType } from 'generated/prisma';
 
 @Injectable()
 export class PaymentService {
-    constructor(private readonly prismaService: PrismaService) {
-    }
-
-
+    constructor(private readonly prismaService: PrismaService) { }
 
     private calculateTaxCredit(data: PaymentCardDTO): Decimal {
         const amount = new Decimal(data.amount);
@@ -19,45 +16,46 @@ export class PaymentService {
         }
 
         if (data.installments > 12) {
-            throw new BadRequestException('Número máximo de parcelas é 12.');
+            throw new BadRequestException('Maximum number of installments is 12.');
         }
 
-        const interestRate = new Decimal(0.02); // 2% ao mês
-        const multiplier = Decimal.pow(interestRate.add(1), data.installments); // (1 + 0.02)^n
+        const interestRate = new Decimal(0.02); 
+        const multiplier = Decimal.pow(interestRate.add(1), data.installments); 
 
-        return amount.mul(multiplier).toDecimalPlaces(2); // Arredonda para 2 casas
+        return amount.mul(multiplier).toDecimalPlaces(2); 
     }
 
-
-    async paymentCrediCard(id: number, data: PaymentCardDTO) {
+    async paymentCreditCard(data: PaymentCardDTO) {
         const card = await this.prismaService.card.findUnique({
             where: { cardNumber: data.numCard },
         });
 
-        if (!card) throw new NotFoundException('Card not found!');
+        if (!card) throw new NotFoundException('Card not found.');
+
         if (card.cardType !== CardType.CREDIT_CARD)
-            throw new BadRequestException('This card is not enabled for credit.');
-        if (card.cvv !== data.cvv) throw new BadRequestException('Invalid CVV');
+            throw new BadRequestException('This card is not authorized for credit payments.');
+
+        if (card.cvv !== data.cvv) throw new BadRequestException('Invalid CVV.');
 
         const expiration = new Date(card.expirationDate);
-        if (expiration < new Date()) throw new BadRequestException('Card is expired!');
+        if (expiration < new Date()) throw new BadRequestException('Card is expired.');
 
         const originAccount = await this.prismaService.account.findUnique({
             where: { id: card.accountId },
         });
 
-        if (!originAccount) throw new NotFoundException('Origin account not found!');
+        if (!originAccount) throw new NotFoundException('Origin account not found.');
 
         const destinationAccount = await this.prismaService.account.findUnique({
             where: { accountNumber: data.destinationAccount },
         });
 
-        if (!destinationAccount) throw new NotFoundException('Destination account not found!');
+        if (!destinationAccount) throw new NotFoundException('Destination account not found.');
 
-        const totalAmount = this.calculateTaxCredit(data); // valor com juros
+        const totalAmount = this.calculateTaxCredit(data);
 
         if (originAccount.balance.lt(totalAmount)) {
-            throw new BadRequestException('Insufficient balance!');
+            throw new BadRequestException('Insufficient balance.');
         }
 
         await this.prismaService.$transaction([
@@ -69,34 +67,121 @@ export class PaymentService {
                 where: { id: destinationAccount.id },
                 data: { balance: destinationAccount.balance.add(data.amount) },
             }),
+            this.prismaService.payment.create({
+                data: {
+                    barcode: "0".repeat(44),
+                    description: `payment credit at value: ${data.amount}`,
+                    date: new Date(),
+                    payment: 'CREDIT',
+                    accountId: originAccount.id,
+                    amount: data.amount
+                }
+            })
         ]);
     }
 
-    async receiveByBarCode(data: ReceivePaymentDTO) {
+    async paymentDebit(data: PaymentCardDTO) {
+
+        const card = await this.prismaService.card.findUnique({
+            where: { cardNumber: data.numCard },
+        });
+
+        if (!card) throw new NotFoundException('Card not found.');
+
+        if (card.cardType !== CardType.DEBIT_CARD && card.cardType !== CardType.CREDIT_CARD) {
+            throw new BadRequestException('This card is not authorized for debit payments.');
+        }
+
+        if (card.cvv !== data.cvv) throw new BadRequestException('Invalid CVV.');
+
+        const expiration = new Date(card.expirationDate);
+        if (expiration < new Date()) throw new BadRequestException('Card is expired.');
+
+        const originAccount = await this.prismaService.account.findUnique({
+            where: { id: card.accountId },
+        });
+
+        if (!originAccount) throw new NotFoundException('Origin account not found.');
+
+        const destinationAccount = await this.prismaService.account.findUnique({
+            where: { accountNumber: data.destinationAccount },
+        });
+
+        if (!destinationAccount) throw new NotFoundException('Destination account not found.');
+
+        if (originAccount.balance.lt(data.amount)) {
+            throw new BadRequestException('Insufficient balance.');
+        }
+
+
+        await this.prismaService.$transaction([
+            this.prismaService.account.update({
+                where: { id: originAccount.id },
+                data: { balance: originAccount.balance.minus(data.amount) },
+            }),
+            this.prismaService.account.update({
+                where: { id: destinationAccount.id },
+                data: { balance: destinationAccount.balance.add(data.amount) },
+            }),
+            this.prismaService.payment.create({
+                data: {
+                    barcode: "0".repeat(44),
+                    description: `payment debit at value: ${data.amount}`,
+                    date: new Date(),
+                    payment: 'DEBIT',
+                    accountId: originAccount.id,
+                    amount: data.amount
+                }
+            })
+        ]);
+
+    }
+
+    async receiveByBarcode(data: ReceivePaymentDTO) {
         if (!data.barcode || data.barcode.length < 44) {
-            throw new BadRequestException('Código de barras inválido!');
+            throw new BadRequestException('Invalid barcode.');
+        }
+
+    
+
+        const barcode = await this.prismaService.payment.findUnique({
+            where: {
+                barcode: data.barcode
+            }
+        })
+
+        if (!barcode) {
+            throw new NotFoundException('bar code not found.');
         }
 
         const originAccount = await this.prismaService.account.findUnique({
-            where: { accountNumber: data.numAccount },
-        });
+            where: {
+                accountNumber: data.numAccount
+            }
+        })
 
-        if (!originAccount) {
-            throw new NotFoundException('Conta de origem não encontrada!');
+        if(!originAccount){
+            throw new NotFoundException('account not found.');
+        }
+
+        const amount = new Decimal(barcode.amount);
+
+        if(new Decimal(data.amount) !== amount){
+            throw new BadRequestException("")
+        }
+
+        if (originAccount.balance.lt(amount)) {
+            throw new BadRequestException('Insufficient balance in origin account.');
         }
 
         const destinationAccount = await this.prismaService.account.findUnique({
-            where: { accountNumber: data.destination },
-        });
+            where: {
+                accountNumber: data.destination
+            }
+        })
 
-        if (!destinationAccount) {
-            throw new NotFoundException('Conta destino não encontrada!');
-        }
-
-        const amount = new Decimal(data.amount);
-
-        if (originAccount.balance.lt(amount)) {
-            throw new BadRequestException('Saldo insuficiente na conta de origem!');
+        if(!destinationAccount){
+            throw new NotFoundException("account destination not found.")
         }
 
         await this.prismaService.$transaction([
@@ -112,6 +197,16 @@ export class PaymentService {
                     balance: destinationAccount.balance.add(amount),
                 },
             }),
+            this.prismaService.payment.create({
+                data: {
+                    barcode: data.barcode,
+                    description: data.description,
+                    date: new Date(),
+                    payment: 'BANK_SLIP',
+                    accountId: originAccount.id,
+                    amount: amount
+                }
+            })
         ]);
     }
 
@@ -121,7 +216,7 @@ export class PaymentService {
         });
 
         if (!originAccount) {
-            throw new NotFoundException('Chave Pix de origem não encontrada!');
+            throw new NotFoundException('Origin Pix key not found.');
         }
 
         const destinationAccount = await this.prismaService.account.findUnique({
@@ -129,13 +224,13 @@ export class PaymentService {
         });
 
         if (!destinationAccount) {
-            throw new NotFoundException('Chave Pix de destino não encontrada!');
+            throw new NotFoundException('Destination Pix key not found.');
         }
 
         const amount = new Decimal(data.amount);
 
         if (originAccount.balance.lt(amount)) {
-            throw new BadRequestException('Saldo insuficiente na conta de origem!');
+            throw new BadRequestException('Insufficient balance in origin account.');
         }
 
         await this.prismaService.$transaction([
@@ -151,31 +246,40 @@ export class PaymentService {
                     balance: destinationAccount.balance.add(amount),
                 },
             }),
+            this.prismaService.payment.create({
+                data: {
+                    description: data.description,
+                    date: new Date(),
+                    accountId: originAccount.id,
+                    payment: 'PIX',
+                    amount: data.amount,
+                    barcode: "0".repeat(44)
+                }
+            })
         ]);
     }
 
-    async generateBarCode(data: PaymentBarCodeDTO) {
+    async generateBarcode(data: PaymentBarCodeDTO) {
         const account = await this.prismaService.account.findUnique({
             where: {
                 id: data.accountId
             }
-        })
-
+        });
 
         if (!account) {
-            throw new Error('Account not found');
+            throw new Error('Account not found.');
         }
 
         const payment = await this.prismaService.payment.create({
             data: {
                 date: new Date(),
                 accountId: account.id,
-                barcode: data.barCode,
+                barcode: data.barcode,
                 description: data.productDescription,
                 payment: 'BANK_SLIP'
             }
-        })
-        return payment.barcode
-    }
+        });
 
+        return payment.barcode;
+    }
 }
